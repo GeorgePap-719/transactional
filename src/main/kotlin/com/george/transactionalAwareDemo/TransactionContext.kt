@@ -16,14 +16,14 @@ open class TransactionContext(private val hashMap: ContextValue) {
         }
     }
 
-    operator fun plus(context: TransactionContext): TransactionContext {
+    open operator fun plus(context: TransactionContext): TransactionContext {
         val newContext = ConcurrentHashMap<Key<*>, TransactionalElement>()
         newContext.putAll(hashMap)
         context.entries.forEach { newContext[it.key] = it.value }
         return TransactionContext(newContext)
     }
 
-    operator fun minus(key: Key<*>): TransactionContext {
+    open operator fun minus(key: Key<*>): TransactionContext {
         val newContext = ConcurrentHashMap<Key<*>, TransactionalElement>()
         newContext.putAll(hashMap)
         newContext.remove(key)
@@ -41,12 +41,23 @@ open class TransactionContext(private val hashMap: ContextValue) {
     }
 }
 
+object EmptyTransactionContext : TransactionContext(ConcurrentHashMap()) {
+    override fun <E : TransactionalElement> get(key: Key<E>): E? = null
+    override fun plus(context: TransactionContext): TransactionContext =
+        if (context is EmptyTransactionContext) this else context
+
+    override fun minus(key: Key<*>): TransactionContext = EmptyTransactionContext
+}
+
 fun newTransactionContext(context: ContextValue = ConcurrentHashMap()): TransactionContext {
+    if (context.isEmpty()) return EmptyTransactionContext
     return TransactionContext(context)
 }
 
 //
 
-interface TransactionScope {
+interface TransactionalScope {
     val transactionContext: TransactionContext
 }
+
+class TransactionalScopeImpl(override val transactionContext: TransactionContext) : TransactionalScope

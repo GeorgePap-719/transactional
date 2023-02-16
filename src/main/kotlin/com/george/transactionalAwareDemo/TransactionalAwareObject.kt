@@ -1,5 +1,7 @@
 package com.george.transactionalAwareDemo
 
+import java.util.concurrent.ConcurrentHashMap
+
 abstract class TransactionalAwareObject<T> {
     private val jobs = mutableSetOf<TransactionalJob<T>>()
 
@@ -52,3 +54,7 @@ interface TransactionalAction<in T> {
     val value: T.() -> Any?
 }
 typealias Action<T> = T.() -> Any?
+
+class ConcurrentHashMapTransactionalAction<K, V>(
+    override val value: ConcurrentHashMap<K, V>.() -> Any?
+) : TransactionalAction<ConcurrentHashMap<K, V>>

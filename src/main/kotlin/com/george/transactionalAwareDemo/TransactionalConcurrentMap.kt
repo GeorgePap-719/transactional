@@ -11,7 +11,7 @@ class TransactionalConcurrentMap<K, V>(
         action(current)
     }
 
-    fun transactional(action: ConcurrentHashMap<K, V>.() -> Any?) {
+    fun TransactionalScope.action(action: ConcurrentHashMap<K, V>.() -> Any?) {
         val transactionalAction = ConcurrentHashMapTransactionalAction(action)
         val job = TransactionalJob(transactionalAction)
         addTransaction(job)
