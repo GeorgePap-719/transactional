@@ -1,35 +1,35 @@
 package com.george.transactionalAwareDemo
 
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 interface TransactionalScope {
     val transactionContext: TransactionContext
 
-    val transactionChannel: ReceiveChannel<TransactionSignal>
+    val transactionChannel: SharedFlow<TransactionSignal>
 
-    fun commitTransaction()
+    suspend fun commitTransaction()
 
-    fun rollbackTransaction()
+    suspend fun rollbackTransaction()
 
     fun completeTransaction()
 }
 
 class TransactionalScopeImpl(override val transactionContext: TransactionContext) : TransactionalScope {
-    private val channel = Channel<TransactionSignal>()
+    private val channel = MutableSharedFlow<TransactionSignal>()
 
-    override val transactionChannel: ReceiveChannel<TransactionSignal> get() = channel
+    override val transactionChannel: SharedFlow<TransactionSignal> get() = channel
 
-    override fun commitTransaction() {
-        channel.trySend(Commit)
+    override suspend fun commitTransaction() {
+        channel.emit(Commit)
     }
 
-    override fun rollbackTransaction() {
-        channel.trySend(RolledBack)
+    override suspend fun rollbackTransaction() {
+        channel.emit(RolledBack)
     }
 
     override fun completeTransaction() {
-        channel.close()
+        channel
     }
 }
 

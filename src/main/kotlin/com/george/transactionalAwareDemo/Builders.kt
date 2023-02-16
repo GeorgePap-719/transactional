@@ -1,10 +1,11 @@
 package com.george.transactionalAwareDemo
 
+import kotlinx.coroutines.flow.first
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-fun <T, R> TransactionalScope.transactional(
+suspend fun <T, R> TransactionalScope.transactional(
     receiver: TransactionalAwareObject<T>,
     block: TransactionalAwareObject<T>.() -> TransactionalAction<T, R>
 ): R {
@@ -20,7 +21,7 @@ fun <T, R> TransactionalScope.transactional(
         throw e
     }
     // wait for signal
-    when (transactionChannel.tryReceive().getOrThrow()) {
+    when (transactionChannel.first()) {
         Commit -> {
             // commit() & retrieve result
             val commit = receiver.commit(job.key)
@@ -42,9 +43,9 @@ fun <T, R> TransactionalScope.transactional(
 }
 
 @OptIn(ExperimentalContracts::class)
-fun <R> transactionalScope(
+suspend fun <R> transactionalScope(
     context: TransactionContext = EmptyTransactionContext,
-    block: TransactionalScope.() -> R
+    block: suspend TransactionalScope.() -> R
 ) {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
@@ -67,13 +68,15 @@ fun <R> transactionalScope(
 }
 
 
-fun main() {
+suspend fun main() {
     val map = TransactionalConcurrentMap<String, String>()
-        transactionalScope {
-            transactional(map) {
-              transactionalAction { put("hi", "hi23") }
-            }
+    transactionalScope {
+        val result = transactional(map) {
+            transactionalAction { put("hi", "hi23") }
         }
+        println("result:$result")
+    }
+    println("lets print map:$map")
     // goal
     /*
      * transactional {
