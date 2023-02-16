@@ -7,11 +7,11 @@ class TransactionalConcurrentMap<K, V>(
 ) : TransactionalAwareObject<ConcurrentHashMap<K, V>>() {
     private var current: ConcurrentHashMap<K, V> = concurrentHashMap
 
-    override fun commitSafely(action: ConcurrentHashMap<K, V>.() -> Any?): Any? {
+    override fun <R> commitSafely(action: ConcurrentHashMap<K, V>.() -> R): R {
         return action(current)
     }
 
-    override fun transactionalAction(action: Action<ConcurrentHashMap<K, V>>): TransactionalAction<ConcurrentHashMap<K, V>> {
+    override fun <R> transactionalAction(action: Action<ConcurrentHashMap<K, V>, R>): TransactionalAction<ConcurrentHashMap<K, V>, R> {
         val transactionalAction = ConcurrentHashMapTransactionalAction(action)
         val job = TransactionalJob(transactionalAction)
         addTransaction(job)
@@ -19,11 +19,6 @@ class TransactionalConcurrentMap<K, V>(
     }
 }
 
-class ConcurrentHashMapTransactionalAction<K, V>(
-    override val value: ConcurrentHashMap<K, V>.() -> Any?
-) : TransactionalAction<ConcurrentHashMap<K, V>>
-
-fun <T> TransactionalAwareObject<T>.action(action: Action<T>): TransactionalAction<T> {
-    val _action = transactionalAction { action }
-    _action.value(this)
-}
+class ConcurrentHashMapTransactionalAction<K, V, R>(
+    override val value: ConcurrentHashMap<K, V>.() -> R
+) : TransactionalAction<ConcurrentHashMap<K, V>, R>

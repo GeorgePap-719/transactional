@@ -1,7 +1,7 @@
 package com.george.transactionalAwareDemo
 
-open class TransactionalJob<T>(
-    action: TransactionalAction<T>
+open class TransactionalJob<T, R>(
+    action: TransactionalAction<T, R>
 ) : TransactionContext.TransactionalElement() {
     private var state = ActionState.WAITING
     private val actionValue = action.value
@@ -11,9 +11,9 @@ open class TransactionalJob<T>(
     val isCommitted = state == ActionState.COMMITTED
     val isROLLBACKED = state == ActionState.ROLLBACKED
 
-    private fun getActionOrNull(): Action<T>? = if (state == ActionState.WAITING) actionValue else null
+    private fun getActionOrNull(): Action<T, R>? = if (state == ActionState.WAITING) actionValue else null
 
-    fun getActionAndCommitOrNull(perform: (action: Action<T>) -> Any?): Any? { // null || Unit
+    fun getActionAndCommitOrNull(perform: (action: Action<T, R>) -> Any?): Any? { // null || Unit
         val canDoAction = getActionOrNull() ?: return null
         try {
             perform(canDoAction)
@@ -35,7 +35,7 @@ open class TransactionalJob<T>(
         state = ActionState.ROLLBACKED
     }
 
-    companion object Job : Key<TransactionalJob<*>>
+    companion object Job : Key<TransactionalJob<*, *>>
 
     private enum class ActionState {
         WAITING,

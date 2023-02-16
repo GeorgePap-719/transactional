@@ -6,11 +6,11 @@ import kotlin.contracts.contract
 
 fun <T, R> TransactionalScope.transactional(
     receiver: TransactionalAwareObject<T>,
-    block: TransactionalScope.() -> TransactionalAction<T>
+    block: TransactionalAwareObject<T>.() -> TransactionalAction<T, R>
 ): R {
-    var job: TransactionalJob<T>? = null
+    var job: TransactionalJob<T, R>? = null
     try {
-        val action = block(this)
+        val action = block(receiver)
         job = TransactionalJob(action)
         receiver.addTransaction(job)
         // block
@@ -69,7 +69,11 @@ fun <R> transactionalScope(
 
 fun main() {
     val map = TransactionalConcurrentMap<String, String>()
-
+        transactionalScope {
+            transactional(map) {
+              transactionalAction { put("hi", "hi23") }
+            }
+        }
     // goal
     /*
      * transactional {
