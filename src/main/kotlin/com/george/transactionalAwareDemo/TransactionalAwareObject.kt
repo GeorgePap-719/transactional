@@ -1,7 +1,5 @@
 package com.george.transactionalAwareDemo
 
-import java.util.concurrent.ConcurrentHashMap
-
 abstract class TransactionalAwareObject<T> {
     private val jobs = mutableSetOf<TransactionalJob<T>>()
 
@@ -11,23 +9,28 @@ abstract class TransactionalAwareObject<T> {
         jobs.add(job)
     }
 
-    fun commit(key: TransactionContext.Key<*>) {
+    fun commit(key: TransactionContext.Key<*>): Any? { // result || TransactionState
         val transactionalJob = jobs[key]
         if (transactionalJob == null) {
             // action is rollbacked already.
             // There is nothing we can do at this point
+            return ROLLEDBACK
         } else {
+            var commitResult: Any? = null
             val action = transactionalJob.getActionAndCommitOrNull {
                 try {
-                    commitSafely(it)
+                    commitResult = commitSafely(it)
                 } catch (e: Throwable) {
                     rollback(key)
                     throw e
                 }
                 finalizeCommit(key)
             }
-            if (action == null) {
+            return if (action == null) {
                 rollback(key)
+                error("job:$transactionalJob has commenced rollback")
+            } else {
+                commitResult
             }
         }
     }
@@ -36,7 +39,8 @@ abstract class TransactionalAwareObject<T> {
         jobs.remove(key.asJob())
     }
 
-    abstract fun commitSafely(action: T.() -> Any?)
+    abstract fun commitSafely(action: Action<T>): Any?
+    abstract fun transactionalAction(action: Action<T>): TransactionalAction<T>
 
     private fun finalizeCommit(key: TransactionContext.Key<*>) {
         jobs.remove(key.asJob())
@@ -55,6 +59,6 @@ interface TransactionalAction<in T> {
 }
 typealias Action<T> = T.() -> Any?
 
-class ConcurrentHashMapTransactionalAction<K, V>(
-    override val value: ConcurrentHashMap<K, V>.() -> Any?
-) : TransactionalAction<ConcurrentHashMap<K, V>>
+data class TransactionState(val value: String)
+
+val ROLLEDBACK = TransactionState("ROLLEDBACK")

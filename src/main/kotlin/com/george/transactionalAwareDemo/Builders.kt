@@ -4,16 +4,29 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-fun <R> TransactionalScope.transactional(
-    block: TransactionalScope.() -> R
+fun <T, R> TransactionalScope.transactional(
+    receiver: TransactionalAwareObject<T>,
+    block: TransactionalScope.() -> TransactionalAction<T>
 ): R {
+    var job: TransactionalJob<T>?
     try {
+        val action = block(this)
+        job = TransactionalJob(action)
+        receiver.addTransaction(job)
         // block
     } catch (e: Throwable) {
         // rollback
+        receiver.rollback(job.key)
         throw e
     }
-    // commit()
+    // commit() & retrieve result
+    val commit = receiver.commit(job.key)
+    if (commit is TransactionState && commit == ROLLEDBACK) {
+        error("transaction has rolled back")
+    } else {
+        @Suppress("UNCHECKED_CAST")
+        return commit as R
+    }
 }
 
 @OptIn(ExperimentalContracts::class)
@@ -37,10 +50,8 @@ fun <R> transactionalScope(
 fun main() {
     val map = TransactionalConcurrentMap<String, String>()
     transactionalScope {
-        transactional {
-            with(map) {
-                this@transactionalScope.action { this.put("hi", "test") }
-            }
+        transactional(map) {
+            map.action { this.put() }
         }
     }
 
