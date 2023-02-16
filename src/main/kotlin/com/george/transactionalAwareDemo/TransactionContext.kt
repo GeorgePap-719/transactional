@@ -53,11 +53,3 @@ fun newTransactionContext(context: ContextValue = ConcurrentHashMap()): Transact
     if (context.isEmpty()) return EmptyTransactionContext
     return TransactionContext(context)
 }
-
-//
-
-interface TransactionalScope {
-    val transactionContext: TransactionContext
-}
-
-class TransactionalScopeImpl(override val transactionContext: TransactionContext) : TransactionalScope
