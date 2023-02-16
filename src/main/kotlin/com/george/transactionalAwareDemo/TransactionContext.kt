@@ -41,10 +41,8 @@ open class TransactionContext(private val hashMap: ContextValue) {
     }
 }
 
-fun newTransactionContext(context: ContextValue): TransactionContext = if (context.isEmpty()) {
-    TransactionContext(ConcurrentHashMap())
-} else {
-    TransactionContext(context)
+fun newTransactionContext(context: ContextValue = ConcurrentHashMap()): TransactionContext {
+    return TransactionContext(context)
 }
 
 //
