@@ -2,8 +2,13 @@ package com.george.transactionalAwareDemo.planc
 
 import java.util.concurrent.ConcurrentHashMap
 
-fun test() {
-    val list = listOf<String>()
+fun main() {
+    val emptyList = mutableListOf<String>()
+    val list = TransactionalList(emptyList)
+    transactional {
+        getAndExecute(list) { transactionalAdd(this@transactional, 1, "") }
+
+    }
 }
 
 /*
@@ -17,16 +22,22 @@ typealias Action<T, R> = T.() -> R
 /**
  * Will act as a store for actions.
  */
-class TransactionalContext<T> {
-    private val actions = ConcurrentHashMap<Key, Action<T, *>>()
+class TransactionalContext {
+    private val actions = ConcurrentHashMap<Key, Action<*, *>>()
 
-    operator fun <R> get(key: Key): Action<T, R>? {
+    operator fun <T, R> get(key: Key): Action<T, R>? {
         @Suppress("UNCHECKED_CAST")
         return actions[key] as Action<T, R>?
     }
 
-    operator fun <R> set(key: Key, action: Action<T, R>) {
+    operator fun <T, R> set(key: Key, action: Action<T, R>) {
         actions[key] = action
+    }
+
+    operator fun <T, R> plus(action: Action<T, R>): Key {
+        val key = Key()
+        actions[key] = action
+        return key
     }
 
     fun removeAt(key: Key) {
@@ -44,8 +55,6 @@ class TransactionalContext<T> {
  * This implementation does not solve concurrency issues.
  */
 class TransactionalList<T>(private val list: MutableList<T>) : AbstractMutableList<T>() {
-    private val transactions = TransactionalContext<MutableList<T>>()
-
     override val size: Int get() = list.size
 
     override fun add(index: Int, element: T) {
@@ -64,27 +73,40 @@ class TransactionalList<T>(private val list: MutableList<T>) : AbstractMutableLi
 
 
     fun <R> TransactionalScope.commit(key: TransactionalContext.Key) {
-        val action = transactions.get<R>(key) ?: error("todo")
-        action(list)
-        transactions.removeAt(key) // finalize transaction
+        val action = transactionalContext.get<MutableList<T>, R>(key)
     }
 
-    fun TransactionalScope.rollback(key: TransactionalContext.Key) {
-        transactions.removeAt(key)
+    fun TransactionalScope.rollback(key: TransactionalContext.Key) {} // no need since it up to transactional {} now
+
+    fun transactionalAdd(scope: TransactionalScope, index: Int, element: T) {
+        scope.transactionalContext.plus<MutableList<T>, Unit> { add(index, element) }
     }
 
+    fun transactionalRemoveAt(scope: TransactionalScope, index: Int) {
+        scope.transactionalContext.plus<MutableList<T>, T> { removeAt(index) }
+    }
 }
 
 
-interface TransactionalScope
+class TransactionalScope {
+    val transactionalContext: TransactionalContext = TransactionalContext()
+}
 
 /*
  * Not sure how this should behave
  */
-fun <T> transactional(block: () -> T) { //:R
+fun <T> transactional(block: TransactionalScope.() -> T) { //:R
+    val scope = TransactionalScope()
     try {
 
     } catch (e: Throwable) {
 
     }
+}
+
+fun <T> TransactionalScope.getAndExecute(
+    txAwareObject: TransactionalList<T>,
+    block: TransactionalList<T>.() -> Any?
+): T {
+
 }
